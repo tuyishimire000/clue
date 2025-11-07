@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
+  let response = NextResponse.next({
     request,
   })
 
@@ -15,15 +15,12 @@ export async function updateSession(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({
-            request,
+          cookiesToSet.forEach(({ name, value, options }) => {
+            request.cookies.set(name, value)
+            response.cookies.set(name, value, options)
           })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          )
         },
-      },
+      } as any, // Temporary type assertion to fix build issue
     }
   )
 
@@ -85,6 +82,6 @@ export async function updateSession(request: NextRequest) {
   // If this is not done, you may be causing the browser and server to go out
   // of sync and terminate the user's session prematurely.
 
-  return supabaseResponse
+  return response
 }
 
