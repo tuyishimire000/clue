@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
+import Link from 'next/link'
 
 interface User {
   id: string
@@ -22,7 +23,7 @@ interface Referral {
   referred_user: {
     email: string
     full_name: string
-  }
+  } | null
 }
 
 interface CheckIn {
@@ -36,6 +37,7 @@ export default function DashboardPage() {
   const supabase = createClient()
   const queryClient = useQueryClient()
   const [user, setUser] = useState<User | null>(null)
+  const [showNotification, setShowNotification] = useState(true)
 
   // Listen for auth state changes
   useEffect(() => {
@@ -45,7 +47,6 @@ export default function DashboardPage() {
       if (event === 'SIGNED_OUT' || !session) {
         router.push('/login')
       } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        // Refresh user data when auth state changes
         queryClient.invalidateQueries({ queryKey: ['user'] })
       }
     })
@@ -73,10 +74,7 @@ export default function DashboardPage() {
         .single()
 
       if (error) {
-        // If user profile doesn't exist, it might still be creating
-        // Wait a bit and retry, or redirect to login
         if (error.code === 'PGRST116') {
-          // User profile not found - might be a new user, wait and retry
           await new Promise(resolve => setTimeout(resolve, 1000))
           const { data: retryData, error: retryError } = await supabase
             .from('users')
@@ -108,7 +106,6 @@ export default function DashboardPage() {
     queryFn: async () => {
       if (!user?.id) return []
 
-      // Fetch referrals
       const { data: referralsData, error: referralsError } = await supabase
         .from('referrals')
         .select('*')
@@ -118,7 +115,6 @@ export default function DashboardPage() {
       if (referralsError) throw referralsError
       if (!referralsData || referralsData.length === 0) return []
 
-      // Fetch user details for referred users
       const referredIds = referralsData.map(r => r.referred_id)
       const { data: usersData, error: usersError } = await supabase
         .from('users')
@@ -127,7 +123,6 @@ export default function DashboardPage() {
 
       if (usersError) throw usersError
 
-      // Combine data
       return referralsData.map(ref => ({
         ...ref,
         referred_user: usersData?.find(u => u.id === ref.referred_id) || null
@@ -137,7 +132,7 @@ export default function DashboardPage() {
   })
 
   // Fetch check-ins
-  const { data: checkIns, isLoading: checkInsLoading } = useQuery({
+  const { data: checkIns } = useQuery({
     queryKey: ['checkins', user?.id],
     queryFn: async () => {
       if (!user?.id) return []
@@ -212,7 +207,7 @@ export default function DashboardPage() {
 
   if (userLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-indigo-50 to-white">
         <div className="bg-white p-8 rounded-lg shadow-lg">
           <div className="text-xl text-gray-800">Loading your dashboard...</div>
         </div>
@@ -222,7 +217,7 @@ export default function DashboardPage() {
 
   if (userError) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-indigo-50 to-white">
         <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
           <h2 className="text-2xl font-bold mb-4 text-red-600">Error</h2>
           <p className="text-gray-700 mb-4">
@@ -249,7 +244,7 @@ export default function DashboardPage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-indigo-50 to-white">
         <div className="bg-white p-8 rounded-lg shadow-lg">
           <div className="text-xl text-gray-800">Redirecting to login...</div>
         </div>
@@ -258,144 +253,157 @@ export default function DashboardPage() {
   }
 
   const referralLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/register?ref=${user.referral_code}`
+  const referralBonus = (referrals?.length || 0) * 50
+  const dailyReward = 100 + referralBonus
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-6 flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
+    <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-white pb-20">
+      {/* Header */}
+      <header className="bg-indigo-600 py-4">
+        <div className="container mx-auto px-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="bg-white rounded-xl p-2 shadow-lg">
+                <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-xl flex items-center justify-center shadow-md">
+                  <span className="text-white text-2xl font-bold">C</span>
+                </div>
+              </div>
+              <div className="text-white">
+                <div className="font-semibold">{user.full_name || 'User'}</div>
+                <div className="text-sm text-indigo-200">{user.email}</div>
+              </div>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="text-white hover:text-indigo-200 text-sm font-medium"
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Banner */}
+      <div className="relative h-40 bg-gradient-to-r from-indigo-500 via-indigo-600 to-indigo-700 overflow-hidden">
+        <div className="absolute inset-0 opacity-10">
+          <div 
+            className="absolute inset-0"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.3'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
+            }}
+          ></div>
+        </div>
+        <div className="relative h-full flex items-center justify-center px-4">
+          <div className="text-center text-white">
+            <div className="text-4xl mb-2">💰</div>
+            <div className="text-3xl font-bold mb-1">{user.balance} RWF</div>
+            <div className="text-indigo-100">Your Balance</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Notification Bar */}
+      {showNotification && (
+        <div className="bg-indigo-100 border-b border-indigo-200 px-4 py-2 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-indigo-700 text-sm">
+              Welcome back, {user.full_name || 'User'}! Keep earning rewards daily.
+            </span>
+          </div>
           <button
-            onClick={handleLogout}
-            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
+            onClick={() => setShowNotification(false)}
+            className="text-indigo-600 hover:text-indigo-800"
           >
-            Logout
+            ✕
           </button>
         </div>
+      )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Balance Card */}
-          <div className="bg-white p-6 rounded-lg shadow-lg">
-            <h2 className="text-lg font-semibold text-gray-700 mb-2">Balance</h2>
-            <p className="text-3xl font-bold text-indigo-600">{user.balance} RWF</p>
+      <main className="container mx-auto px-4 py-6 space-y-6">
+        {/* Wallet Section */}
+        <section>
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">Wallet</h2>
+          <div className="grid grid-cols-2 gap-4">
+            <button
+              className="bg-gradient-to-br from-pink-400 via-pink-500 to-orange-500 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 text-white text-center"
+            >
+              <div className="text-5xl mb-3">💳</div>
+              <div className="font-bold text-lg">RECHARGE</div>
+              <div className="text-sm mt-1 opacity-90">Add funds</div>
+            </button>
+            <button
+              className="bg-gradient-to-br from-indigo-400 via-indigo-500 to-indigo-600 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 text-white text-center"
+            >
+              <div className="text-5xl mb-3">📤</div>
+              <div className="font-bold text-lg">WITHDRAW</div>
+              <div className="text-sm mt-1 opacity-90">Cash out</div>
+            </button>
           </div>
+        </section>
 
-          {/* Referral Code Card */}
-          <div className="bg-white p-6 rounded-lg shadow-lg">
-            <h2 className="text-lg font-semibold text-gray-700 mb-2">Your Referral Code</h2>
-            <p className="text-2xl font-mono font-bold text-indigo-600 mb-3">{user.referral_code}</p>
-            <div className="space-y-2">
-              <input
-                type="text"
-                value={referralLink}
-                readOnly
-                className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded text-sm"
-              />
+        {/* Service Section */}
+        <section>
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">Service</h2>
+          <div className="grid grid-cols-2 gap-4">
+            <button
+              onClick={handleCheckIn}
+              disabled={hasCheckedInToday || checkInMutation.isPending}
+              className="bg-white border-2 border-indigo-300 rounded-2xl p-6 shadow-md hover:shadow-lg transition-all transform hover:scale-105 text-center disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <div className="text-5xl mb-3">✅</div>
+              <div className="font-bold text-gray-800 text-lg">Daily Check-in</div>
+              {hasCheckedInToday ? (
+                <div className="text-sm text-green-600 mt-1 font-medium">Already checked in!</div>
+              ) : (
+                <div className="text-sm text-indigo-600 mt-1 font-medium">Earn {dailyReward} RWF</div>
+              )}
+            </button>
+            <Link
+              href="#referrals"
+              className="bg-white border-2 border-indigo-300 rounded-2xl p-6 shadow-md hover:shadow-lg transition-all transform hover:scale-105 text-center"
+            >
+              <div className="text-5xl mb-3">👥</div>
+              <div className="font-bold text-gray-800 text-lg">Referrals</div>
+              <div className="text-sm text-indigo-600 mt-1 font-medium">
+                {referrals?.length || 0} referrals
+              </div>
+            </Link>
+          </div>
+        </section>
+
+        {/* Interactive Cards */}
+        <section>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-gradient-to-br from-red-400 to-pink-500 rounded-2xl p-6 shadow-lg text-white relative overflow-hidden">
+              <div className="absolute top-2 right-2 text-2xl">🎁</div>
+              <div className="font-bold text-lg mt-4">Referral Code</div>
+              <div className="text-sm mt-2 opacity-90 font-mono">{user.referral_code}</div>
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(referralLink)
                   alert('Referral link copied!')
                 }}
-                className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm"
+                className="mt-3 text-xs bg-white/20 px-3 py-1 rounded-lg hover:bg-white/30 transition"
               >
                 Copy Link
               </button>
             </div>
+            <div className="bg-gradient-to-br from-blue-400 to-orange-400 rounded-2xl p-6 shadow-lg text-white relative overflow-hidden">
+              <div className="absolute bottom-2 right-2 text-3xl">🎉</div>
+              <div className="font-bold text-lg">Team Stats</div>
+              <div className="text-2xl font-bold mt-2">{referrals?.length || 0}</div>
+              <div className="text-sm mt-1 opacity-90">Total Referrals</div>
+            </div>
           </div>
+        </section>
 
-          {/* Referrals Count Card */}
-          <div className="bg-white p-6 rounded-lg shadow-lg">
-            <h2 className="text-lg font-semibold text-gray-700 mb-2">Total Referrals</h2>
-            <p className="text-3xl font-bold text-indigo-600">
-              {referralsLoading ? '...' : referrals?.length || 0}
-            </p>
-            <p className="text-sm text-gray-500 mt-2">
-              +{((referrals?.length || 0) * 50)} RWF/day bonus
-            </p>
-          </div>
-        </div>
-
-        {/* Daily Check-In */}
-        <div className="mt-6 bg-white p-6 rounded-lg shadow-lg">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">Daily Check-In</h2>
-          {hasCheckedInToday ? (
-            <div className="p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg">
-              ✅ You&apos;ve already checked in today! Come back tomorrow for more rewards.
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-gray-700 mb-2">
-                  <strong>Base Reward:</strong> 100 RWF
-                </p>
-                <p className="text-gray-700">
-                  <strong>Referral Bonus:</strong> {(referrals?.length || 0) * 50} RWF ({referrals?.length || 0} referrals × 50 RWF)
-                </p>
-                <p className="text-lg font-bold text-indigo-600 mt-2">
-                  Total Reward: {100 + ((referrals?.length || 0) * 50)} RWF
-                </p>
-              </div>
-              <button
-                onClick={handleCheckIn}
-                disabled={checkInMutation.isPending}
-                className="w-full md:w-auto px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
-              >
-                {checkInMutation.isPending ? 'Processing...' : 'Check In Now'}
-              </button>
-              {checkInMutation.isError && (
-                <div className="p-3 bg-red-100 border border-red-400 text-red-700 rounded">
-                  {checkInMutation.error?.message || 'Failed to check in'}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Referrals List */}
-        <div className="mt-6 bg-white p-6 rounded-lg shadow-lg">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">Your Referrals</h2>
-          {referralsLoading ? (
-            <p className="text-gray-500">Loading...</p>
-          ) : referrals && referrals.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2 px-4 text-gray-700">Email</th>
-                    <th className="text-left py-2 px-4 text-gray-700">Name</th>
-                    <th className="text-left py-2 px-4 text-gray-700">Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {referrals.map((referral) => (
-                    <tr key={referral.id} className="border-b">
-                      <td className="py-2 px-4 text-gray-600">
-                        {(referral.referred_user as any)?.email || 'N/A'}
-                      </td>
-                      <td className="py-2 px-4 text-gray-600">
-                        {(referral.referred_user as any)?.full_name || 'N/A'}
-                      </td>
-                      <td className="py-2 px-4 text-gray-600">
-                        {format(new Date(referral.created_at), 'MMM d, yyyy')}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p className="text-gray-500">No referrals yet. Share your link to earn bonuses!</p>
-          )}
-        </div>
-
-        {/* Check-In History */}
-        <div className="mt-6 bg-white p-6 rounded-lg shadow-lg">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">Recent Check-Ins</h2>
-          {checkInsLoading ? (
-            <p className="text-gray-500">Loading...</p>
-          ) : checkIns && checkIns.length > 0 ? (
+        {/* Recent Activity */}
+        {checkIns && checkIns.length > 0 && (
+          <section className="bg-white rounded-2xl shadow-md p-6">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">Recent Check-ins</h2>
             <div className="space-y-2">
-              {checkIns.map((checkIn) => (
-                <div key={checkIn.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+              {checkIns.slice(0, 5).map((checkIn) => (
+                <div key={checkIn.id} className="flex justify-between items-center p-3 bg-indigo-50 rounded-lg">
                   <div>
                     <p className="font-medium text-gray-700">
                       {format(new Date(checkIn.created_at), 'MMM d, yyyy')}
@@ -408,12 +416,66 @@ export default function DashboardPage() {
                 </div>
               ))}
             </div>
-          ) : (
-            <p className="text-gray-500">No check-ins yet. Check in daily to earn rewards!</p>
-          )}
-        </div>
-      </div>
+          </section>
+        )}
+
+        {/* Referrals List */}
+        {referrals && referrals.length > 0 && (
+          <section id="referrals" className="bg-white rounded-2xl shadow-md p-6">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">Your Referrals</h2>
+            <div className="space-y-2">
+              {referrals.map((referral) => (
+                <div key={referral.id} className="flex justify-between items-center p-3 bg-indigo-50 rounded-lg">
+                  <div>
+                    <p className="font-medium text-gray-700">
+                      {referral.referred_user?.full_name || referral.referred_user?.email || 'Unknown'}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {format(new Date(referral.created_at), 'MMM d, yyyy')}
+                    </p>
+                  </div>
+                  <div className="text-indigo-600 font-semibold">+50 RWF/day</div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+      </main>
+
+      {/* Footer Navigation */}
+      <footer className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-indigo-100 shadow-2xl z-50">
+        <nav className="container mx-auto px-4">
+          <div className="grid grid-cols-4 gap-1 py-3">
+            <Link
+              href="/dashboard"
+              className="flex flex-col items-center justify-center py-2 text-indigo-600 rounded-lg"
+            >
+              <div className="text-3xl mb-1">🏠</div>
+              <span className="text-xs font-semibold">Home</span>
+            </Link>
+            <button
+              className="flex flex-col items-center justify-center py-2 text-gray-400 hover:text-indigo-600 transition-colors rounded-lg hover:bg-indigo-50"
+            >
+              <div className="text-3xl mb-1">💼</div>
+              <span className="text-xs font-semibold">Invest</span>
+            </button>
+            <Link
+              href="#referrals"
+              className="flex flex-col items-center justify-center py-2 text-gray-400 hover:text-indigo-600 transition-colors rounded-lg hover:bg-indigo-50"
+            >
+              <div className="text-3xl mb-1">👥</div>
+              <span className="text-xs font-semibold">Team</span>
+            </Link>
+            <button
+              onClick={handleLogout}
+              className="flex flex-col items-center justify-center py-2 text-gray-400 hover:text-indigo-600 transition-colors rounded-lg hover:bg-indigo-50"
+            >
+              <div className="text-3xl mb-1">👤</div>
+              <span className="text-xs font-semibold">Me</span>
+            </button>
+          </div>
+        </nav>
+      </footer>
     </div>
   )
 }
-
