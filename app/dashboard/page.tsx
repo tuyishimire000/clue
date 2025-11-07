@@ -453,12 +453,13 @@ export default function DashboardPage() {
               <div className="text-3xl mb-1">🏠</div>
               <span className="text-xs font-semibold">Home</span>
             </Link>
-            <button
+            <Link
+              href="/invest"
               className="flex flex-col items-center justify-center py-2 text-gray-400 hover:text-indigo-600 transition-colors rounded-lg hover:bg-indigo-50"
             >
               <div className="text-3xl mb-1">💼</div>
               <span className="text-xs font-semibold">Invest</span>
-            </button>
+            </Link>
             <Link
               href="#referrals"
               className="flex flex-col items-center justify-center py-2 text-gray-400 hover:text-indigo-600 transition-colors rounded-lg hover:bg-indigo-50"
