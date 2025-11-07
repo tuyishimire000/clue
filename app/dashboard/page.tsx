@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import Link from 'next/link'
+import Image from 'next/image'
 
 interface User {
   id: string
@@ -324,20 +325,22 @@ export default function DashboardPage() {
         <section>
           <h2 className="text-2xl font-bold text-gray-800 mb-4">Wallet</h2>
           <div className="grid grid-cols-2 gap-4">
-            <button
+            <Link
+              href="/recharge"
               className="bg-gradient-to-br from-pink-400 via-pink-500 to-orange-500 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 text-white text-center"
             >
               <div className="text-5xl mb-3">💳</div>
               <div className="font-bold text-lg">RECHARGE</div>
               <div className="text-sm mt-1 opacity-90">Add funds</div>
-            </button>
-            <button
-              className="bg-gradient-to-br from-indigo-400 via-indigo-500 to-indigo-600 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 text-white text-center"
+            </Link>
+            <Link
+              href="/withdraw"
+              className="bg-gradient-to-br from-indigo-400 via-indigo-500 to-indigo-600 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 text-white text-center block"
             >
               <div className="text-5xl mb-3">📤</div>
               <div className="font-bold text-lg">WITHDRAW</div>
               <div className="text-sm mt-1 opacity-90">Cash out</div>
-            </button>
+            </Link>
           </div>
         </section>
 
@@ -440,6 +443,90 @@ export default function DashboardPage() {
             </div>
           </section>
         )}
+
+        {/* Company Information Section */}
+        <section className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl shadow-lg p-6 border border-indigo-100">
+          <div className="flex items-start gap-4 mb-4">
+            <div className="bg-indigo-600 rounded-xl p-3 shadow-md">
+              <span className="text-white text-3xl">💉</span>
+            </div>
+            <div className="flex-1">
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">About Clue</h2>
+              <p className="text-sm text-indigo-600 font-semibold mb-3">Mother Company of Vaccination Manufacturing</p>
+            </div>
+          </div>
+
+          {/* Manufacturing Facility Image */}
+          <div className="mb-4 rounded-xl overflow-hidden shadow-md border border-indigo-200 relative aspect-video">
+            <Image
+              src="https://www.pharmaceutical-technology.com/wp-content/uploads/sites/24/2023/02/Image-2_BioNTech-mRNA-Vaccine-Manufacturing-Facility_Rwanda-Africa.jpg"
+              alt="mRNA Vaccine Manufacturing Facility in Africa"
+              fill
+              className="object-cover"
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            />
+          </div>
+
+          <div className="space-y-4 text-gray-700">
+            <p className="leading-relaxed">
+              Clue is incorporated with a leading biotechnology company that operates a state-of-the-art modular messenger ribonucleic acid (mRNA) vaccine manufacturing facility in Africa. This strategic partnership enables sustainable vaccine production and end-to-end vaccine supply for African Union member states.
+            </p>
+
+            <div className="bg-white rounded-xl p-4 border border-indigo-100">
+              <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                <span className="text-indigo-600">🏭</span>
+                Manufacturing Excellence
+              </h3>
+              <ul className="space-y-2 text-sm">
+                <li className="flex items-start gap-2">
+                  <span className="text-indigo-600 mt-1">✓</span>
+                  <span><strong>Modular Design:</strong> High-tech, digitally enabled modular manufacturing units for rapid deployment and scalability</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-indigo-600 mt-1">✓</span>
+                  <span><strong>Production Capacity:</strong> Initial capacity of approximately 50 million vaccine doses per year</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-indigo-600 mt-1">✓</span>
+                  <span><strong>Vaccine Development:</strong> Active programs in malaria and tuberculosis vaccine development</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-indigo-600 mt-1">✓</span>
+                  <span><strong>Facility Size:</strong> 35,000m² facility with advanced manufacturing infrastructure</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="bg-white rounded-xl p-4 border border-indigo-100">
+              <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                <span className="text-indigo-600">🔬</span>
+                Technology & Innovation
+              </h3>
+              <p className="text-sm leading-relaxed mb-2">
+                The manufacturing facility utilizes container-based plug-and-play solutions with modular design, standardized equipment, and advanced software components. This enables rapid setup of fully-functional mRNA manufacturing capabilities, supporting single to multi-drug production for both clinical trials and commercial production.
+              </p>
+              <p className="text-sm leading-relaxed">
+                The facility includes state-of-the-art quality control laboratories, quality assurance systems, warehousing capabilities, and specialized cold and frozen storage facilities to ensure vaccine integrity throughout the supply chain.
+              </p>
+            </div>
+
+            <div className="bg-white rounded-xl p-4 border border-indigo-100">
+              <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                <span className="text-indigo-600">🌍</span>
+                Strategic Impact
+              </h3>
+              <p className="text-sm leading-relaxed">
+                This partnership represents a significant step toward building a decentralized, robust network of end-to-end vaccine manufacturing across Africa. The facility serves as a model project that guides the establishment of mRNA-based vaccine manufacturing facilities of varying sizes to meet local and regional healthcare needs. Our commitment extends to training specialized personnel and ensuring compliance with international regulatory standards, working closely with continental and international health agencies.
+              </p>
+            </div>
+
+            <div className="bg-indigo-100 rounded-lg p-4 border border-indigo-200">
+              <p className="text-sm text-indigo-900 font-medium">
+                <strong>Investment:</strong> $150 million has been invested in developing this cutting-edge manufacturing infrastructure, demonstrating our long-term commitment to advancing healthcare in Africa and supporting the continent&apos;s self-sufficiency in vaccine production.
+              </p>
+            </div>
+          </div>
+        </section>
       </main>
 
       {/* Footer Navigation */}
@@ -461,19 +548,19 @@ export default function DashboardPage() {
               <span className="text-xs font-semibold">Invest</span>
             </Link>
             <Link
-              href="#referrals"
+              href="/team"
               className="flex flex-col items-center justify-center py-2 text-gray-400 hover:text-indigo-600 transition-colors rounded-lg hover:bg-indigo-50"
             >
               <div className="text-3xl mb-1">👥</div>
               <span className="text-xs font-semibold">Team</span>
             </Link>
-            <button
-              onClick={handleLogout}
+            <Link
+              href="/me"
               className="flex flex-col items-center justify-center py-2 text-gray-400 hover:text-indigo-600 transition-colors rounded-lg hover:bg-indigo-50"
             >
               <div className="text-3xl mb-1">👤</div>
               <span className="text-xs font-semibold">Me</span>
-            </button>
+            </Link>
           </div>
         </nav>
       </footer>

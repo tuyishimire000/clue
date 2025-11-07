@@ -318,18 +318,19 @@ export default function InvestPage() {
               <span className="text-xs font-semibold">Invest</span>
             </Link>
             <Link
-              href="/dashboard#referrals"
+              href="/team"
               className="flex flex-col items-center justify-center py-2 text-gray-400 hover:text-indigo-600 transition-colors rounded-lg hover:bg-indigo-50"
             >
               <div className="text-3xl mb-1">👥</div>
               <span className="text-xs font-semibold">Team</span>
             </Link>
-            <button
+            <Link
+              href="/me"
               className="flex flex-col items-center justify-center py-2 text-gray-400 hover:text-indigo-600 transition-colors rounded-lg hover:bg-indigo-50"
             >
               <div className="text-3xl mb-1">👤</div>
               <span className="text-xs font-semibold">Me</span>
-            </button>
+            </Link>
           </div>
         </nav>
       </footer>
