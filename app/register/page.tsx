@@ -75,7 +75,7 @@ export default function RegisterPage() {
         
         {referralCode && (
           <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded text-sm">
-            🎉 You're signing up with a referral code!
+            🎉 You&apos;re signing up with a referral code!
           </div>
         )}
 

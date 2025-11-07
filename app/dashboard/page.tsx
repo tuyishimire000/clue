@@ -319,7 +319,7 @@ export default function DashboardPage() {
           <h2 className="text-xl font-semibold text-gray-800 mb-4">Daily Check-In</h2>
           {hasCheckedInToday ? (
             <div className="p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg">
-              ✅ You've already checked in today! Come back tomorrow for more rewards.
+              ✅ You&apos;ve already checked in today! Come back tomorrow for more rewards.
             </div>
           ) : (
             <div className="space-y-4">

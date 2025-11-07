@@ -96,7 +96,7 @@ export default function LoginPage() {
         <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
           <h2 className="text-2xl font-bold mb-4 text-gray-800">Check your email</h2>
           <p className="text-gray-600 mb-4">
-            We've sent a magic link to <strong>{email}</strong>. Click the link to sign in.
+            We&apos;ve sent a magic link to <strong>{email}</strong>. Click the link to sign in.
           </p>
           <button
             onClick={() => setMagicLinkSent(false)}
@@ -173,7 +173,7 @@ export default function LoginPage() {
 
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-600">
-            Don't have an account?{' '}
+            Don&apos;t have an account?{' '}
             <Link href="/register" className="text-indigo-600 hover:text-indigo-700 font-medium">
               Sign up
             </Link>
