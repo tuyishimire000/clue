@@ -102,40 +102,41 @@ export default function WithdrawPage() {
     setLoading(true)
 
     try {
-      // TODO: In production, verify withdrawal password and process withdrawal through payment gateway
-      // For now, we'll simulate the withdrawal
-      
       const fee = calculateFee(amountValue)
       const netAmount = calculateNetAmount(amountValue)
 
-      // Update user balance
-      const newBalance = user.balance - amountValue
-      
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({ balance: newBalance })
-        .eq('id', user.id)
+      const response = await fetch('/api/withdraw', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          amount: amountValue,
+          withdrawPassword,
+          account_number: null, // TODO: Get from user profile
+          account_name: null, // TODO: Get from user profile
+        }),
+      })
 
-      if (updateError) throw updateError
+      const result = await response.json()
 
-      // TODO: Record withdrawal in database (create withdrawals table if needed)
-      // TODO: Process actual withdrawal through payment gateway
+      if (!response.ok) {
+        throw new Error(result.error || 'Withdrawal failed')
+      }
+
+      // Invalidate and refetch user data to get updated balance
+      await queryClient.invalidateQueries({ queryKey: ['user'] })
+      await queryClient.invalidateQueries({ queryKey: ['withdrawals'] })
+      await queryClient.refetchQueries({ queryKey: ['user'] })
 
       setSuccess(true)
       setAmount('')
       setWithdrawPassword('')
-      
-      // Invalidate user query to refresh balance
-      queryClient.invalidateQueries({ queryKey: ['user'] })
 
-      // Show success message
-      alert(`Withdrawal request submitted successfully!\n\nAmount: ${amountValue.toLocaleString()} RWF\nFee: ${fee.toLocaleString()} RWF\nNet Amount: ${netAmount.toLocaleString()} RWF\n\nFunds will be credited within 24-72 hours.`)
-      
-      // Redirect to dashboard after a delay
+      // Redirect to dashboard after 3 seconds
       setTimeout(() => {
         router.push('/dashboard')
-      }, 2000)
-
+      }, 3000)
     } catch (err: any) {
       setError(err.message || 'Withdrawal failed. Please try again.')
     } finally {

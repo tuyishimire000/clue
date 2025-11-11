@@ -11,13 +11,31 @@ export async function updateSession(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return request.cookies.getAll()
+        get(name: string) {
+          return request.cookies.get(name)?.value
         },
-        setAll(cookiesToSet: Array<{ name: string; value: string; options?: any }>) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            request.cookies.set(name, value)
-            response.cookies.set(name, value, options)
+        set(name: string, value: string, options: any) {
+          request.cookies.set({
+            name,
+            value,
+            ...options,
+          })
+          response.cookies.set({
+            name,
+            value,
+            ...options,
+          })
+        },
+        remove(name: string, options: any) {
+          request.cookies.set({
+            name,
+            value: '',
+            ...options,
+          })
+          response.cookies.set({
+            name,
+            value: '',
+            ...options,
           })
         },
       }
@@ -40,11 +58,37 @@ export async function updateSession(request: NextRequest) {
     console.log('[Middleware] User error:', userError?.message || 'none')
   }
 
+  // Check admin access for admin routes
+  if (user && request.nextUrl.pathname.startsWith('/admin')) {
+    try {
+      const { data: userData } = await supabase
+        .from('users')
+        .select('is_admin, is_active')
+        .eq('id', user.id)
+        .single()
+
+      if (!userData || !userData.is_admin || !userData.is_active) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[Middleware] Non-admin user trying to access admin route')
+        }
+        const url = request.nextUrl.clone()
+        url.pathname = '/dashboard'
+        return NextResponse.redirect(url)
+      }
+    } catch (error) {
+      // If error checking admin status, redirect to dashboard
+      const url = request.nextUrl.clone()
+      url.pathname = '/dashboard'
+      return NextResponse.redirect(url)
+    }
+  }
+
   if (
     !user &&
     !request.nextUrl.pathname.startsWith('/login') &&
     !request.nextUrl.pathname.startsWith('/register') &&
     !request.nextUrl.pathname.startsWith('/auth/callback') &&
+    !request.nextUrl.pathname.startsWith('/admin') &&
     request.nextUrl.pathname !== '/'
   ) {
     // no user, potentially respond by redirecting the user to the login page

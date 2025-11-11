@@ -8,6 +8,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 interface User {
   id: string
   balance: number
+  recharge_wallet?: number
+  total_recharge?: number
 }
 
 // Payment account details - in production, this would come from your backend
@@ -34,7 +36,6 @@ function PaymentProcessForm() {
   const method = searchParams.get('method')
   const account = searchParams.get('account')
   
-  const [amountPaid, setAmountPaid] = useState(0)
   const [isChecking, setIsChecking] = useState(false)
   const [paymentStatus, setPaymentStatus] = useState<'pending' | 'completed' | 'failed'>('pending')
 
@@ -50,7 +51,7 @@ function PaymentProcessForm() {
 
       const { data, error } = await supabase
         .from('users')
-        .select('id, balance')
+        .select('id, balance, recharge_wallet, total_recharge')
         .eq('id', authUser.id)
         .single()
 
@@ -91,37 +92,45 @@ function PaymentProcessForm() {
     return method === 'MTN' ? 'MTN MoMo' : 'Airtel Money'
   }
 
-  const handleRefresh = async () => {
+  const handleConfirmPayment = async () => {
     setIsChecking(true)
     
-    // Simulate checking payment status
-    // In production, this would call your backend API to check payment status
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    
-    // Mock: Randomly determine if payment is complete
-    // In production, this would check actual payment gateway status
-    const random = Math.random()
-    if (random > 0.7) {
-      // Payment completed
-      setAmountPaid(parseInt(amount || '0'))
-      setPaymentStatus('completed')
-      
-      // Update user balance in database
-      if (user?.id) {
-        await supabase
-          .from('users')
-          .update({ balance: user.balance + parseInt(amount || '0') })
-          .eq('id', user.id)
-        
-        queryClient.invalidateQueries({ queryKey: ['user'] })
+    // Create recharge transaction with pending status
+    if (user?.id) {
+      try {
+        const response = await fetch('/api/recharge', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            amount: parseInt(amount || '0'),
+            payment_method: method || 'MTN',
+            paid_number: account || '',
+          }),
+        })
+
+        const result = await response.json()
+
+        if (response.ok) {
+          // Payment confirmed, transaction created as pending
+          setPaymentStatus('completed') // 'completed' here means payment confirmed, not approved
+          
+          // Invalidate user queries (though balance won't update until admin approval)
+          await queryClient.invalidateQueries({ queryKey: ['user'] })
+          
+          // Redirect to dashboard after 2 seconds with success message
+          setTimeout(() => {
+            router.push('/dashboard')
+          }, 2000)
+        } else {
+          console.error('Recharge failed:', result.error)
+          setPaymentStatus('failed')
+        }
+      } catch (error) {
+        console.error('Failed to process recharge:', error)
+        setPaymentStatus('failed')
       }
-      
-      // Redirect to dashboard after 3 seconds
-      setTimeout(() => {
-        router.push('/dashboard')
-      }, 3000)
-    } else {
-      setPaymentStatus('pending')
     }
     
     setIsChecking(false)
@@ -241,44 +250,69 @@ function PaymentProcessForm() {
 
             <div className="ml-4">
               <h2 className="text-lg font-semibold text-gray-800 mb-1">
-                Payment completed?
+                Confirm Payment
               </h2>
               <p className="text-sm text-gray-600 mb-4">
-                Click <span className="text-orange-600 font-semibold">Refresh</span> to check if it is successful
+                After making the payment, click <span className="text-orange-600 font-semibold">Confirm Payment</span> to submit for admin approval
               </p>
 
-              {/* Amount Paid Box */}
+              {/* Payment Confirmation Box */}
               <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-sm text-gray-600">Amount paid:</div>
-                  <button
-                    onClick={handleRefresh}
-                    disabled={isChecking || paymentStatus === 'completed'}
-                    className="bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-orange-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isChecking ? 'Checking...' : 'Refresh'}
-                  </button>
-                </div>
-                
-                <div className={`text-3xl font-bold mb-2 ${
-                  paymentStatus === 'completed' 
-                    ? 'text-green-600' 
-                    : paymentStatus === 'failed'
-                    ? 'text-red-600'
-                    : 'text-gray-400'
-                }`}>
-                  RWF {amountPaid.toLocaleString()}
+                <div className="mb-4">
+                  <div className="text-sm text-gray-600 mb-2">Amount to recharge:</div>
+                  <div className="text-3xl font-bold text-gray-800 mb-4">
+                    RWF {parseInt(amount || '0').toLocaleString()}
+                  </div>
                 </div>
 
+                {paymentStatus === 'pending' && (
+                  <>
+                    <button
+                      onClick={handleConfirmPayment}
+                      disabled={isChecking}
+                      className="w-full bg-orange-600 text-white py-3 rounded-lg text-base font-semibold hover:bg-orange-700 transition disabled:opacity-50 disabled:cursor-not-allowed mb-3"
+                    >
+                      {isChecking ? 'Processing...' : 'Confirm Payment'}
+                    </button>
+                    <div className="text-xs text-gray-500 text-center">
+                      Click to confirm that you have completed the payment. Your recharge will be reviewed by admin before being added to your wallet.
+                    </div>
+                  </>
+                )}
+
                 {paymentStatus === 'completed' && (
-                  <div className="text-sm text-green-600 font-medium mb-2">
-                    ✓ Payment successful! Redirecting...
+                  <div className="space-y-3">
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                      <div className="text-sm text-green-700 font-medium mb-1">
+                        ✓ Payment Confirmed
+                      </div>
+                      <div className="text-xs text-green-600">
+                        Your payment has been confirmed and submitted for admin approval. Your recharge wallet will be updated once approved.
+                      </div>
+                    </div>
+                    <div className="text-sm text-gray-600 text-center">
+                      Redirecting to dashboard...
+                    </div>
                   </div>
                 )}
 
-                <div className="text-xs text-gray-500">
-                  The payment is expected to be successful in 2-10 minutes. Click to refresh the results.
-                </div>
+                {paymentStatus === 'failed' && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <div className="text-sm text-red-700 font-medium mb-1">
+                      ✗ Payment Processing Failed
+                    </div>
+                    <div className="text-xs text-red-600 mb-3">
+                      {paymentStatus === 'failed' ? 'Failed to process payment confirmation. Please try again.' : ''}
+                    </div>
+                    <button
+                      onClick={handleConfirmPayment}
+                      disabled={isChecking}
+                      className="w-full bg-orange-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-orange-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isChecking ? 'Processing...' : 'Try Again'}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>

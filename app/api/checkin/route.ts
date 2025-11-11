@@ -54,9 +54,9 @@ export async function POST() {
     }
 
     // Calculate reward
-    const baseReward = 100
+    const baseReward = 50
     const referralCount = referrals?.length || 0
-    const bonusReward = referralCount * 50
+    const bonusReward = referralCount * 20
     const totalReward = baseReward + bonusReward
 
     // Create check-in record
@@ -68,7 +68,11 @@ export async function POST() {
       })
 
     if (checkInError) {
-      return NextResponse.json({ error: 'Failed to record check-in' }, { status: 500 })
+      console.error('Check-in insert error:', checkInError)
+      return NextResponse.json({ 
+        error: 'Failed to record check-in',
+        details: checkInError.message 
+      }, { status: 500 })
     }
 
     // Update user balance

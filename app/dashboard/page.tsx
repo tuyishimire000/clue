@@ -15,6 +15,8 @@ interface User {
   referral_code: string
   referred_by: string | null
   balance: number
+  recharge_wallet?: number
+  total_recharge?: number
 }
 
 interface Referral {
@@ -37,8 +39,21 @@ export default function DashboardPage() {
   const router = useRouter()
   const supabase = createClient()
   const queryClient = useQueryClient()
-  const [user, setUser] = useState<User | null>(null)
   const [showNotification, setShowNotification] = useState(true)
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
+
+  // Check authentication status first
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
+      if (authError || !authUser) {
+        router.push('/login')
+      } else {
+        setIsCheckingAuth(false)
+      }
+    }
+    checkAuth()
+  }, [router, supabase.auth])
 
   // Listen for auth state changes
   useEffect(() => {
@@ -64,7 +79,6 @@ export default function DashboardPage() {
       const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
       
       if (authError || !authUser) {
-        router.push('/login')
         return null
       }
 
@@ -76,41 +90,88 @@ export default function DashboardPage() {
 
       if (error) {
         if (error.code === 'PGRST116') {
-          await new Promise(resolve => setTimeout(resolve, 1000))
-          const { data: retryData, error: retryError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', authUser.id)
-            .single()
+          // User profile doesn't exist - try to create it
+          console.log('User profile not found, creating profile...')
           
-          if (retryError) {
-            console.error('User profile not found after retry:', retryError)
-            throw new Error('User profile not found. Please contact support.')
+          // Generate referral code
+          const generateReferralCode = () => {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+            let code = ''
+            for (let i = 0; i < 8; i++) {
+              code += chars.charAt(Math.floor(Math.random() * chars.length))
+            }
+            return code
           }
-          
-          setUser(retryData)
-          return retryData
+
+          // Generate referral code - we'll handle uniqueness check differently
+          // to avoid RLS recursion issues
+          let referralCode = generateReferralCode()
+
+          // Create user profile
+          const { data: newUser, error: createError } = await supabase
+            .from('users')
+            .insert({
+              id: authUser.id,
+              email: authUser.email || '',
+              full_name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || '',
+              referral_code: referralCode,
+              referred_by: authUser.user_metadata?.referred_by || null,
+              balance: 0,
+              recharge_wallet: 0,
+              total_recharge: 0,
+              is_admin: false,
+              is_active: true,
+            })
+            .select()
+            .single()
+
+          if (createError) {
+            console.error('Failed to create user profile:', createError)
+            throw new Error(`Failed to create user profile: ${createError.message}`)
+          }
+
+          // If referred, create referral record
+          if (newUser.referred_by) {
+            const { data: referrer } = await supabase
+              .from('users')
+              .select('id')
+              .eq('referral_code', newUser.referred_by)
+              .single()
+
+            if (referrer) {
+              await supabase
+                .from('referrals')
+                .insert({
+                  referrer_id: referrer.id,
+                  referred_id: authUser.id,
+                })
+                .select()
+            }
+          }
+
+          return newUser
         }
-        throw error
+        console.error('Error fetching user data:', error)
+        throw new Error(`Failed to load user data: ${error.message}`)
       }
       
-      setUser(data)
       return data
     },
     retry: 2,
     retryDelay: 1000,
+    enabled: !isCheckingAuth,
   })
 
   // Fetch referrals
   const { data: referrals, isLoading: referralsLoading } = useQuery({
-    queryKey: ['referrals', user?.id],
+    queryKey: ['referrals', userData?.id],
     queryFn: async () => {
-      if (!user?.id) return []
+      if (!userData?.id) return []
 
       const { data: referralsData, error: referralsError } = await supabase
         .from('referrals')
         .select('*')
-        .eq('referrer_id', user.id)
+        .eq('referrer_id', userData.id)
         .order('created_at', { ascending: false })
 
       if (referralsError) throw referralsError
@@ -129,33 +190,33 @@ export default function DashboardPage() {
         referred_user: usersData?.find(u => u.id === ref.referred_id) || null
       })) as Referral[]
     },
-    enabled: !!user?.id,
+    enabled: !!userData?.id,
   })
 
   // Fetch check-ins
   const { data: checkIns } = useQuery({
-    queryKey: ['checkins', user?.id],
+    queryKey: ['checkins', userData?.id],
     queryFn: async () => {
-      if (!user?.id) return []
+      if (!userData?.id) return []
 
       const { data, error } = await supabase
         .from('checkins')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', userData.id)
         .order('created_at', { ascending: false })
         .limit(10)
 
       if (error) throw error
       return data as CheckIn[]
     },
-    enabled: !!user?.id,
+    enabled: !!userData?.id,
   })
 
   // Check if user has checked in today
   const { data: hasCheckedInToday } = useQuery({
-    queryKey: ['checkin-today', user?.id],
+    queryKey: ['checkin-today', userData?.id],
     queryFn: async () => {
-      if (!user?.id) return false
+      if (!userData?.id) return false
 
       const today = new Date()
       today.setHours(0, 0, 0, 0)
@@ -165,7 +226,7 @@ export default function DashboardPage() {
       const { data, error } = await supabase
         .from('checkins')
         .select('id')
-        .eq('user_id', user.id)
+        .eq('user_id', userData.id)
         .gte('created_at', today.toISOString())
         .lt('created_at', tomorrow.toISOString())
         .limit(1)
@@ -173,7 +234,7 @@ export default function DashboardPage() {
       if (error) throw error
       return (data?.length ?? 0) > 0
     },
-    enabled: !!user?.id,
+    enabled: !!userData?.id,
   })
 
   // Check-in mutation
@@ -206,7 +267,7 @@ export default function DashboardPage() {
     window.location.href = '/login'
   }
 
-  if (userLoading) {
+  if (isCheckingAuth || userLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-indigo-50 to-white">
         <div className="bg-white p-8 rounded-lg shadow-lg">
@@ -243,19 +304,14 @@ export default function DashboardPage() {
     )
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-indigo-50 to-white">
-        <div className="bg-white p-8 rounded-lg shadow-lg">
-          <div className="text-xl text-gray-800">Redirecting to login...</div>
-        </div>
-      </div>
-    )
+  if (!userData) {
+    return null // Will redirect via useEffect
   }
 
+  const user = userData
   const referralLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/register?ref=${user.referral_code}`
-  const referralBonus = (referrals?.length || 0) * 50
-  const dailyReward = 100 + referralBonus
+  const referralBonus = (referrals?.length || 0) * 20
+  const dailyReward = 50 + referralBonus
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-white pb-20">
@@ -348,10 +404,9 @@ export default function DashboardPage() {
         <section>
           <h2 className="text-2xl font-bold text-gray-800 mb-4">Service</h2>
           <div className="grid grid-cols-2 gap-4">
-            <button
-              onClick={handleCheckIn}
-              disabled={hasCheckedInToday || checkInMutation.isPending}
-              className="bg-white border-2 border-indigo-300 rounded-2xl p-6 shadow-md hover:shadow-lg transition-all transform hover:scale-105 text-center disabled:opacity-50 disabled:cursor-not-allowed"
+            <Link
+              href="/checkin"
+              className="bg-white border-2 border-indigo-300 rounded-2xl p-6 shadow-md hover:shadow-lg transition-all transform hover:scale-105 text-center block"
             >
               <div className="text-5xl mb-3">✅</div>
               <div className="font-bold text-gray-800 text-lg">Daily Check-in</div>
@@ -360,10 +415,10 @@ export default function DashboardPage() {
               ) : (
                 <div className="text-sm text-indigo-600 mt-1 font-medium">Earn {dailyReward} RWF</div>
               )}
-            </button>
+            </Link>
             <Link
-              href="#referrals"
-              className="bg-white border-2 border-indigo-300 rounded-2xl p-6 shadow-md hover:shadow-lg transition-all transform hover:scale-105 text-center"
+              href="/team"
+              className="bg-white border-2 border-indigo-300 rounded-2xl p-6 shadow-md hover:shadow-lg transition-all transform hover:scale-105 text-center block"
             >
               <div className="text-5xl mb-3">👥</div>
               <div className="font-bold text-gray-800 text-lg">Referrals</div>

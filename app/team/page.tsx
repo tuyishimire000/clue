@@ -96,7 +96,7 @@ export default function TeamPage() {
   }
 
   const totalReferrals = referrals?.length || 0
-  const totalBonus = totalReferrals * 50 // Daily bonus per referral
+  const totalBonus = totalReferrals * 20 // Daily bonus per referral
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-white pb-20">
@@ -202,7 +202,7 @@ export default function TeamPage() {
 
                     {/* Member Stats */}
                     <div className="text-right ml-4">
-                      <div className="text-sm font-bold text-indigo-600">+50 RWF</div>
+                      <div className="text-sm font-bold text-indigo-600">+20 RWF</div>
                       <div className="text-xs text-gray-500">Daily bonus</div>
                       {referral.referred_user?.balance !== undefined && (
                         <div className="text-xs text-gray-600 mt-1">
@@ -257,7 +257,7 @@ export default function TeamPage() {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-indigo-100">Daily Bonus Per Member:</span>
-                <span className="font-bold">+50 RWF</span>
+                <span className="font-bold">+20 RWF</span>
               </div>
               <div className="border-t border-indigo-400 pt-2 mt-2">
                 <div className="flex justify-between items-center">
